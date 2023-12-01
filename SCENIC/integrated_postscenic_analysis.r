@@ -1,6 +1,5 @@
-module load pySCENIC
+#module load pySCENIC
 library(SCopeLoomR)
-library(Seurat)
 library(tidyverse)
 #### This code chunk used for processing the SCENIC output files..
 loom<-open_loom(file.path="integratedALL_aucell_mtx_step3_withAR.loom",mode="r+")
