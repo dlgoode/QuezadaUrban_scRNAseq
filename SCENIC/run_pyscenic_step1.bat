@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --tasks=1
 #SBATCH --cpus-per-task=40
-#SBATCH --mem=120G #180G
+#SBATCH --mem=<set here..> #180G
 #SBATCH --time=10-00:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=<mail id here>
@@ -10,8 +10,8 @@
 #SBATCH --output="<log output.out>"  # lets call the file "<jobID>"
 #SBATCH --error="<log output.err>"  # lets call the file "<jobID>"
 #SBATCH --partition=prod
-
-module load pySCENIC
+#if pySCENIC installed and configured as module...
+module load pySCENIC 
 module load python/3.8.1
 
 res_dir="/pyscenic_results/results_dir"
