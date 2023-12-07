@@ -1,0 +1,210 @@
+library(devtools)
+library(Seurat)
+library(simspec)
+library(shades)
+library(clustree)
+library(msigdbr)
+library(presto)
+library(fgsea)
+library(dplyr)
+library(ggplot2)
+library(loomR)
+library(singleCellTK)
+library(metaseqR)
+library(data.table)
+library(pheatmap)
+library(brainwaver)
+library(tibble)
+library(openxlsx)
+
+Integration_CSS <- merge(graft_8, y = c(graft_5, graft_6, graft_9, graft_11, graft_12.subsampled, graft_13, graft_14, graft_15), add.cell.ids = c("224","387", "272", "305", "224CX", "426_sub", "470B", "435", "373"), project = "INTEGRATION CSS ALL")
+
+
+Integration_CSS <- NormalizeData(Integration_CSS)
+Integration_CSS <- FindVariableFeatures(Integration_CSS, nfeatures = 5000)
+Integration_CSS <- ScaleData(Integration_CSS) #vars.to.regress = "Proliferation_CSEA1"
+Integration_CSS <- RunPCA(Integration_CSS, npcs = 20)
+Integration_CSS <- RunUMAP(Integration_CSS, dims = 1:20)
+
+Integration_CSS <- cluster_sim_spectrum(object = Integration_CSS, label_tag = "name",
+                                                  cluster_resolution = 0.4,
+                                                  corr_method = "pearson",
+                                                  spectrum_type = "corr_kernel")
+Integration_CSS <- RunUMAP(Integration_CSS, reduction = "css", dims = 1:ncol(Embeddings(Integration_CSS, "css")))
+
+Integration_CSS <- run_PCA(Integration_CSS, reduction = "css", npcs = 20)
+Integration_CSS <- RunUMAP(Integration_CSS, reduction = "css_pca", dims = 1:20)
+Integration_CSS <- FindNeighbors(Integration_CSS, reduction = "css_pca", dims = 1:20)
+Integration_CSS <- FindClusters(Integration_CSS, resolution = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9))
+
+clustree(Integration_CSS)
+
+# A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
+# segregate this list into markers of G2/M phase and markers of S phase
+s.genes <- as.vector(cellcyclegenes$s.genes)
+g2m.genes <- as.vector(cellcyclegenes$g2m.genes)
+Integration_CSS <- CellCycleScoring(Integration_CSS, s.features = Proliferation_CSEA, g2m.features = Proliferation_CSEA, set.ident = TRUE)
+
+plot_name <-DimPlot(Integration_CSS, label = FALSE, label.size = 6, group.by = "name", pt.size= 0.8, cols = hcl.colors(9, "Set 2")) 
+plot_clusters <-DimPlot(Integration_CSS, label = TRUE, label.size = 6, pt.size= 0.8,cols = hcl.colors(16, "Set 2")) +  labs(title = "Clusters") 
+plot_Celltype <-DimPlot(Integration_CSS, label = FALSE, label.size = 6, group.by = "Celltype", pt.size= 0.6, cols = hcl.colors(6, "Set 2")) 
+plot_percent.mt <- FeaturePlot(Integration_CSS, features="percent.mt", label = FALSE , label.size=10, cols=c("blue","red"))
+plot_percent.rp <- FeaturePlot(Integration_CSS, features="percent.rp", label = FALSE , label.size=10, cols=c("blue","red"))
+plot_nCount_RNA <- FeaturePlot(Integration_CSS, features="nCount_RNA", cols=c("blue","red"))
+
+plot_Proliferation_CSEA <-FeaturePlot(Integration_CSS, features="Proliferation_CSEA1", min.cutoff=-10, max.cutoff=10)+ scale_fill_manual(values=gradient("viridis",10))
+
+plot_CHGA_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features="CHGA",pt.size= 1.6, min.cutoff=0, max.cutoff=1.5)+ scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_SYP_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features="SYP",pt.size= 1.6, min.cutoff=0, max.cutoff=1)+ scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_NCAM1_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features="NCAM1",pt.size= 1.6, min.cutoff=0, max.cutoff=2.5)+ scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_ASCL1_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features="ASCL1",pt.size= 1.6, min.cutoff=0, max.cutoff=4)+ scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_AR_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features="AR",pt.size= 1.6, min.cutoff=0, max.cutoff=2)+ scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_KLK3_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features="KLK3",pt.size= 1.6, min.cutoff=0, max.cutoff=10)+ scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_NKX3_1_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features="NKX3-1",pt.size= 1.6, min.cutoff=0, max.cutoff=3)+ scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_DPYSL3_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features="DPYSL3",pt.size= 1.6, min.cutoff=0, max.cutoff=10)+ scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+DPYSL3_violinplot <- VlnPlot(Integration_CSS, features = "DPYSL3", pt.size=0.0, log=TRUE)
+
+plot_TF_1_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features= c("ASCL1","ATF3","CEBPB","E2F1") ,pt.size= 0.5, min.cutoff=0) & scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_TF_2_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features= c("FOS","GATA2","HOXB13","JUND") ,pt.size= 0.5, min.cutoff=0) & scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_TF_3_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features= c("MAFG","NFKB1","RFX3","SOX2") ,pt.size= 0.5, min.cutoff=0) & scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+plot_TF_4_CSS__V2_ALL <- FeaturePlot(Integration_CSS, features= c("SOX4","TFF3") ,pt.size= 0.5, min.cutoff=0) & scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+
+
+markers.genes <- c("AR", "KLK3", "NKX3-1", "SYP", "CHGA", "NCAM1")
+Markers.prostate <- VlnPlot(Integration_CSS, features = markers.genes, pt.size=0.0, ncol = 4, log=TRUE)
+
+##### Signature analysis Cancer SEA
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Neuro_1, ctrl = 100, name = 'Neuro_1', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Neuro_2,ctrl = 100,name = 'Neuro_2', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = AR, ctrl = 100,name = 'AR', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = SQUAM,ctrl = 100,name = 'SQUAM', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Beltran_NE_up,ctrl = 100,name = 'Beltran_NE_up', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Beltran_NE_down,ctrl = 100,name = 'Beltran_NE_down', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Angiogenesis_CSEA,ctrl = 100,name = 'Angiogenesis_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = CellCycle_CSEA,ctrl = 100,name = 'CellCycle_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = DNA_damage_CSEA,ctrl = 100,name = 'DNA_damage_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = EMT_CSEA,ctrl = 100,name = 'EMT_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Inflammation_CSEA,ctrl = 100,name = 'Inflammation_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Metastasis_CSEA,ctrl = 100,name = 'Metastasis_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Quiescence_CSEA,ctrl = 100,name = 'Quiescence_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Apoptosis_CSEA,ctrl = 100,name = 'Apoptosis_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Differentiation_CSEA,ctrl = 100,name = 'Differentiation_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = DNA_repair_CSEA,ctrl = 100,name = 'DNA_repair_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Hypoxia_CSEA,ctrl = 100,name = 'Hypoxia_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Invasion_CSEA,ctrl = 100,name = 'Invasion_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Proliferation_CSEA,ctrl = 100,name = 'Proliferation_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Stemness_CSEA,ctrl = 100,name = 'Stemness_CSEA', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = NE_markers,ctrl = 100,name = 'NE_Markers', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = basal_cells,ctrl = 100,name = 'basal_cells', search = FALSE)
+Integration_CSS <- AddModuleScore(object = Integration_CSS, features = Luminal_cells,ctrl = 100,name = 'Luminal_cells', search = FALSE)
+
+
+Dot_markers_NEURO_CancerSEA_CSS_v2_ALL <- DotPlot(Integration_CSS, features = c("Neuro_11", "Neuro_21", "Beltran_NE_up1",
+                                                                                          "Angiogenesis_CSEA1",
+                                                                                          "EMT_CSEA1",
+                                                                                          "Inflammation_CSEA1","Metastasis_CSEA1",
+                                                                                          "Quiescence_CSEA1",
+                                                                                          "Apoptosis_CSEA1",
+                                                                                          "Differentiation_CSEA1","DNA_repair_CSEA1",
+                                                                                          "Hypoxia_CSEA1",
+                                                                                          "Invasion_CSEA1","Proliferation_CSEA1",
+                                                                                          "Stemness_CSEA1",
+                                                                                          "Beltran_NE_down1","AR1") , dot.scale = 8, scale.min = 0, scale.max = 2,  group.by = "seurat_clusters", split.by = "orig.ident") + RotatedAxis() + scale_colour_gradientn(colours = c("#31004a", "#33007b", "#83008b", "#8b0077", "#e83b36", "#ffa345","#ffa345", "#f1f287","#f2f6b1"))
+
+
+
+graft.markers_Integration_CSS <- FindAllMarkers(Integration_CSS, min.pct = 0.1, logfc.threshold = 0.25, return.thresh= 0.05, test.use ="negbinom")
+graft.markers_Integration_CSS$difference <- graft.markers_Integration_CSS$pct.1 - graft.markers_Integration_CSS$pct.2
+graft.markers_graft.markers_Integration_CSS_noThrs <- FindAllMarkers(Integration_CSS, min.pct = 0, logfc.threshold = 0, test.use ="negbinom")
+top10 <- graft.markers_ALL_CSS_res0.4 %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC)
+
+View(top10)
+heatmap_ALL_CSS_v2 <- DoHeatmap(Integration_CSS, features = top10$gene) + scale_fill_gradientn(colours = c("white","midnightblue"))
+
+
+
+######gene set enrichment 
+library(msigdbr)
+library(presto)
+library(fgsea)
+library(dplyr)
+library(ggplot2)
+library(loomR)
+library(Seurat)
+library(singleCellTK)
+library(metaseqR)
+library(data.table)
+library(pheatmap)
+library(brainwaver)
+library(tibble)
+
+m_df_H<- msigdbr(species = "Homo sapiens", category = "H")
+m_df_list_H<- split(m_df_H$gene_symbol, f= m_df_H$gs_name)
+fgsea_sets_H<- m_df_H %>% split(x = .$gene_symbol, f = .$gs_name)
+
+###kegg
+m_df_KEGG<- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+m_df_list_KEGG <- split(m_df_KEGG$gene_symbol, f= m_df_KEGG$gs_name)
+fgsea_sets_KEGG<- m_df_KEGG %>% split(x = .$gene_symbol, f = .$gs_name)
+
+###oncogenic
+m_df_C6<- msigdbr(species = "Homo sapiens", category = "C6")
+m_df_list_C6 <- split(m_df_C6$gene_symbol, f= m_df_C6$gs_name)
+fgsea_sets_C6<- m_df_C6 %>% split(x = .$gene_symbol, f = .$gs_name)
+
+Hallmarks_Neuro_Onco_KEGG <- c(fgsea_sets_H,fgsea_sets_KEGG, fgsea_sets_C6)
+
+class(Signatures_geneSets)
+
+#Sort the gene markers
+cluster_list<- list("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16")
+
+for (i in 1:length(cluster_list)) {
+  cluster_list[[i]] <- graft.markers_Integration_CSS %>%  dplyr::filter(cluster == cluster_list[[i]]) %>% arrange(desc(difference)) %>%  dplyr::select(gene, difference)
+}
+head(cluster_list)
+
+for (i in 1:length(cluster_list)) {
+  cluster_list[[i]] <- deframe(cluster_list[[i]])
+}
+
+for (i in 1:length(cluster_list)) {
+  cluster_list[[i]] <- fgseaMultilevel(Hallmarks_Neuro_Onco_KEGG, eps = 0,minSize = 5,stats = cluster_list[[i]], nPermSimple = 100000)
+}
+
+for (i in 1:length(cluster_list)) {
+  cluster_list[[i]] <- cluster_list[[i]]%>% as_tibble() %>% arrange(pathway)
+}
+
+#### sort data for plot
+clusters<- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16")
+
+for( i in seq_along(cluster_list)){
+  
+  cluster_list[[i]]$Cluster <- rep(clusters[i],nrow(cluster_list[[i]]))
+  
+}
+
+my_names = c("pathway", "padj", "NES", "Cluster", "leadingEdge")
+result = lapply(cluster_list, "[", my_names)
+
+dataframme <- do.call(rbind.data.frame, result)
+
+dataframme_leadingedge <- as.data.frame(dataframme)
+
+dataframme$Cluster <- factor(dataframme$Cluster,
+                             levels = c("1", "2", "3", "4",
+                                        "5", "6", "7", "8", "9",
+                                        "10", "11", "12", "13", "14",
+                                        "15", "16")) 
+
+write.xlsx(result,"GSEA Hallmarks_Oncogenic_KEGG_V2.xlsx")
+
+mybreaks<- c(-1, -0.05, -0.01)
+Mylabels <- c("> 0.1", "0.05", "< 0.01")
+
+GSEA_allSamples_hallmarks_lfc_filtered <- ggplot(dataframme, aes(Cluster, pathway, colour = NES, size = padj )) +
+  geom_point(aes(size=-padj )) + scale_size(breaks= mybreaks, labels = Mylabels, name = "p-adjust") + RotatedAxis() + theme_classic() +
+  scale_colour_gradientn(colours = c("#356EFD", "white", "#FD3535")) + guides(size = guide_legend(reverse=TRUE))+
+  ggtitle("GSEA Hallmarks")
+
